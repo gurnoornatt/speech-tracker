@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Local environment variables
+.env.local
+
+# Build outputs
+/build
+/dist
+/out
+
+# Coverage reports
+/coverage
+
+# macOS system files
+.DS_Store
