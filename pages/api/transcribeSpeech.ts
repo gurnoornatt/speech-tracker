@@ -1,8 +1,8 @@
-// /pages/api/transcribeSpeech.ts
+// pages/api/transcribeSpeech.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
 import fs from 'fs';
-import { ReadStream } from 'fs';
+import FormData from 'form-data';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(400).json({ error: 'Error parsing form data' });
         }
 
-        const file = Array.isArray(files.file) ? files.file[0] : files.file;
+        const file = files.file[0] as formidable.File;
 
         if (!file) {
             console.warn('No file received in transcribeSpeech');
@@ -40,18 +40,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         try {
             const fileStream = fs.createReadStream(file.filepath);
 
-            const buffer = await streamToBuffer(fileStream);
-            const blob = new Blob([buffer]);
             const formData = new FormData();
-            formData.append('file', blob, file.originalFilename || 'speech.wav');
+            formData.append('file', fileStream, file.originalFilename || 'speech.wav');
             formData.append('model', 'whisper-1');
+            formData.append('response_format', 'json'); // You can change this as needed
+            // Add additional parameters as per your requirements
+            // e.g., formData.append('timestamp_granularities', JSON.stringify(['word']));
 
             const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
                 method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${OPENAI_API_KEY}`,
-                },
-                body: formData,
+                headers: formData.getHeaders(),
+                body: formData as unknown as BodyInit,
             });
 
             if (!response.ok) {
@@ -71,16 +70,3 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
     });
 }
-
-// Helper function to convert stream to buffer
-async function streamToBuffer(stream: ReadStream): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-        const chunks: Buffer[] = [];
-        stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-        stream.on('error', reject);
-        stream.on('end', () => resolve(Buffer.concat(chunks)));
-    });
-}
-
-
-

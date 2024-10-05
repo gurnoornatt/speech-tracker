@@ -16,3 +16,22 @@ node_modules/
 .DS_Store
 .env
 
+# Dependencies
+node_modules/
+
+# Environment Variables
+.env.local
+
+# Build Outputs
+/build
+/dist
+/out
+
+# Coverage Reports
+/coverage
+
+# macOS system files
+.DS_Store
+
+# Temporary files
+*.log
