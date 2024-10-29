@@ -1,43 +1,57 @@
 // pages/index.tsx
-import React, { useState } from 'react';
-import AudioUploader from '../components/AudioUploader';
-import { FaSpinner } from 'react-icons/fa';
+import React, { useState, useCallback } from 'react'
+import { useDropzone } from 'react-dropzone'
+import { FaSpinner } from 'react-icons/fa'
 
 const SpeechTracker: React.FC = () => {
-    const [file, setFile] = useState<File | null>(null);
-    const [transcription, setTranscription] = useState<string>('');
-    const [feedback, setFeedback] = useState<string>('');
-    const [isProcessing, setIsProcessing] = useState<boolean>(false);
+    const [transcription, setTranscription] = useState<string>('')
+    const [feedback, setFeedback] = useState<string>('')
+    const [isProcessing, setIsProcessing] = useState<boolean>(false)
 
-    const handleFileUpload = (uploadedFile: File) => {
-        setFile(uploadedFile);
-        setTranscription('');
-        setFeedback('');
-        processAudio(uploadedFile);
-    };
+    const onDrop = useCallback((acceptedFiles: File[]) => {
+        if (acceptedFiles.length === 0) return
+        const file = acceptedFiles[0]
+        processAudio(file)
+    }, [])
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            'audio/*': ['.mp3', '.wav', '.m4a', '.mp4', '.webm'],
+        },
+        maxSize: 25 * 1024 * 1024, // 25 MB
+    })
 
     const processAudio = async (audioFile: File) => {
-        setIsProcessing(true);
+        setIsProcessing(true)
+        setTranscription('')
+        setFeedback('')
+
         try {
             // Step 1: Transcribe Speech
-            const formData = new FormData();
-            formData.append('file', audioFile);
-            formData.append('response_format', 'verbose_json');
-            formData.append('timestamp_granularities', JSON.stringify(['word']));
-            formData.append('prompt', 'The transcript is about OpenAI which makes technology like DALL·E, GPT-3, and ChatGPT with the hope of one day building an AGI system that benefits all of humanity.');
+            const formData = new FormData()
+            formData.append('file', audioFile)
+            formData.append('response_format', 'json')
+            // Removed 'timestamp_granularities'
 
             const transcribeResponse = await fetch('/api/transcribeSpeech', {
                 method: 'POST',
                 body: formData,
-            });
+            })
 
             if (!transcribeResponse.ok) {
-                const errorData = await transcribeResponse.json();
-                throw new Error(errorData.error || 'Failed to transcribe speech');
+                let errorMessage = 'Failed to transcribe speech'
+                try {
+                    const errorData = await transcribeResponse.json()
+                    errorMessage = errorData.error || errorMessage
+                } catch (parseError) {
+                    console.error('Error parsing transcribeResponse:', parseError)
+                }
+                throw new Error(errorMessage)
             }
 
-            const transcribeData = await transcribeResponse.json();
-            setTranscription(transcribeData.transcription);
+            const transcribeData = await transcribeResponse.json()
+            setTranscription(transcribeData.transcription)
 
             // Step 2: Generate Feedback
             const feedbackResponse = await fetch('/api/generateFeedback', {
@@ -46,29 +60,46 @@ const SpeechTracker: React.FC = () => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ transcription: transcribeData.transcription }),
-            });
+            })
 
             if (!feedbackResponse.ok) {
-                const errorData = await feedbackResponse.json();
-                throw new Error(errorData.error || 'Failed to generate feedback');
+                let errorMessage = 'Failed to generate feedback'
+                try {
+                    const errorData = await feedbackResponse.json()
+                    errorMessage = errorData.error || errorMessage
+                } catch (parseError) {
+                    console.error('Error parsing feedbackResponse:', parseError)
+                }
+                throw new Error(errorMessage)
             }
 
-            const feedbackData = await feedbackResponse.json();
-            setFeedback(feedbackData.feedback);
+            const feedbackData = await feedbackResponse.json()
+            setFeedback(feedbackData.feedback)
         } catch (error: any) {
-            console.error('Error processing audio:', error);
-            setFeedback(error.message || 'An error occurred.');
+            console.error('Error processing audio:', error)
+            setFeedback(error.message || 'An error occurred.')
         } finally {
-            setIsProcessing(false);
+            setIsProcessing(false)
         }
-    };
+    }
 
     return (
         <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4">
             <h1 className="text-3xl font-bold mb-6">Speech Tracker</h1>
 
             {/* Audio Uploader */}
-            <AudioUploader onUpload={handleFileUpload} />
+            <div
+                {...getRootProps()}
+                className={`border-2 border-dashed p-6 rounded-lg text-center cursor-pointer ${isDragActive ? 'border-blue-500' : 'border-gray-400'
+                    } w-full max-w-xl`}
+            >
+                <input {...getInputProps()} />
+                {isDragActive ? (
+                    <p>Drop the audio file here...</p>
+                ) : (
+                    <p>Drag & drop an audio file here, or click to select one</p>
+                )}
+            </div>
 
             {/* Transcription */}
             {transcription && (
@@ -94,7 +125,7 @@ const SpeechTracker: React.FC = () => {
                 </div>
             )}
         </div>
-    );
-};
+    )
+}
 
-export default SpeechTracker;
+export default SpeechTracker
